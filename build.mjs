@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 const html = await readFile('index.html', 'utf8');
 const css = await readFile('styles.css', 'utf8');
 const script = await readFile('script.js', 'utf8');
-for (const section of ['about', 'services', 'contact']) {
+for (const section of ['about', 'services', 'documents', 'contact']) {
   assert(html.includes(`id="${section}"`), `필수 영역 누락: ${section}`);
 }
 assert.equal((html.match(/class="service-card"/g) || []).length, 3, '서비스는 3개여야 합니다.');
@@ -18,5 +18,15 @@ await mkdir('dist', { recursive: true });
 for (const file of ['index.html', 'styles.css', 'script.js']) {
   await copyFile(file, `dist/${file}`);
 }
+// Copy only locally linked PDF documents; missing originals must fail the build.
+const documents = new Set([...html.matchAll(/href="(data\/[^"#]+\.pdf)(?:#[^"]*)?"/g)].map(match => match[1]));
+assert(documents.size > 0, '문서 원문 링크가 필요합니다.');
+await mkdir('dist/data', { recursive: true });
+for (const document of documents) {
+  const bytes = await readFile(document);
+  assert.equal(bytes.subarray(0, 5).toString(), '%PDF-', `올바른 PDF가 아닙니다: ${document}`);
+  await copyFile(document, `dist/${document}`);
+}
+assert.equal((html.match(/class="chapter-number"/g) || []).length, 8, '8개 장의 요약이 필요합니다.');
 console.log('Build complete: HTML, CSS, JavaScript → dist/');
-console.log('Verified: navigation targets, 3 services, email/phone links, mobile layout.');
+console.log('Verified: navigation targets, 3 services, email/phone links, mobile layout, 8 chapter summaries, original PDF.');
